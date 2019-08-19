@@ -114,7 +114,7 @@
 // 200-2000 works usually fine for nonrigid registration.
 // The more, the better, but the longer computation time.
 // This is an important parameter!
-(MaximumNumberOfIterations 999)
+(MaximumNumberOfIterations 200)
 
 // The step size of the optimizer, in mm. By default the voxel size is used.
 // which usually works well. In case of unusual high-resolution images
@@ -129,7 +129,7 @@
 // With an AdaptiveStochasticGradientDescent optimizer,
 // in combination with the two options below, around 2000
 // samples may already suffice.
-(NumberOfSpatialSamples 4096)
+(NumberOfSpatialSamples 2048)
 
 // Refresh these spatial samples in every iteration, and select
 // them randomly. See the manual for information on other sampling
