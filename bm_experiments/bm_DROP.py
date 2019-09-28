@@ -41,7 +41,7 @@ Sample run::
 
 .. note:: experiments was tested on Ubuntu (Linux) based OS system
 
-.. note:: to check whether uoi have all needed libraries on Linux use `ldd dropreg2d`,
+.. note:: to check whether you have all needed libraries on Linux use `ldd dropreg2d`,
  see: https://askubuntu.com/a/709271/863070
  AND set path to the `libdroplib.so` as `export LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib`,
  see: https://unix.stackexchange.com/a/67783 ; https://stackoverflow.com/a/49660575/4521646
