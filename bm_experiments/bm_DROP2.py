@@ -14,19 +14,23 @@ Deformable Medical Image Registration: Setting the State of the Art with Discret
 Installation for Linux
 ----------------------
 
-1. Download executable according your operation system,
- https://www.mrf-registration.net/deformable/index.html
-2. Copy/extract executables and libraries to you favourite destination
-3. Install all missing libraries such as QT4 with OpenGL support
-4. Test calling the executable `./dropreg2d` which should return something like::
+1. Download source code: https://github.com/biomedia-mira/drop2
+2. Install all required libraries such as ITK
+3. Build following the instructions in DROP2 project readme
+4. Test calling the executable `./dropreg` which should return something like::
 
+    TODO
     Usage: dropreg2d <source> <target> <result> <paramfile> [mask]
 
 Usage
 -----
 
-To see the explanation of particular parameters see the User Manual
- http://www.mrf-registration.net/download/drop_user_guide_V1.05.pdf
+Sample run of DROP2::
+
+    ./dropreg --mode2d
+        -s S1.jpg -t HE.jpg -o S1_to_HE.nii.gz
+        -l --ltype 0 --lsim 1 --llevels 32 32 32 16 16 16 --lsampling 0.2
+        -n --nffd 1000 --nsim 1 --nlevels 16 16 16 8 8 8 --nlambda 0.5 --npin
 
 Sample run::
 
@@ -54,9 +58,6 @@ import sys
 import logging
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
-from birl.utilities.data_io import (
-    convert_image_to_mhd, convert_image_from_mhd, save_landmarks, load_landmarks, image_sizes)
-from birl.benchmark import ImRegBenchmark
 from bm_experiments import bm_comp_perform
 from bm_experiments.bm_DROP import BmDROP
 
@@ -66,9 +67,6 @@ class BmDROP2(BmDROP):
     no run test while this method requires manual installation of DROP2
 
     For the app installation details, see module details.
-
-    .. note:: DROP requires gray scale images in MHD format where pixel values
-    are in range (0, 255) of uint8.
 
     Example
     -------
@@ -88,6 +86,36 @@ class BmDROP2(BmDROP):
     >>> import shutil
     >>> shutil.rmtree(path_out, ignore_errors=True)
     """
+    #: command for executing the image registration
+    COMMAND_REGISTER = '%(dropRegistration)s --mode2d \
+        -s %(source)s \
+        -t %(target)s \
+        -o %(output)s.nii.gz \
+        %(config)s'
+
+    def _generate_regist_command(self, item):
+        """ generate the registration command
+
+        :param dict item: dictionary with registration params
+        :return str|list(str): the execution commands
+        """
+        logging.debug('.. prepare DROP registration command')
+        with open(self.params['path_config'], 'r') as fp:
+            config = [l.rstrip().replace('\\', '') for l in fp.readlines()]
+        config = ' '.join(config)
+
+        path_im_ref, path_im_move, _, _ = self._get_paths(item)
+        path_dir = self._get_path_reg_dir(item)
+
+        command = self.COMMAND_REGISTER % {
+            'dropRegistration': self.params['exec_DROP'],
+            'source': path_im_move,
+            'target': path_im_ref,
+            'output': os.path.join(path_dir, 'output'),
+            'config': config,
+        }
+
+        return command
 
 
 # RUN by given parameters

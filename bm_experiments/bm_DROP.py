@@ -112,7 +112,7 @@ class BmDROP(ImRegBenchmark):
     def _prepare_img_registration(self, item):
         """ converting the input images to gra-scale and MHD format
 
-        :param dict dict item: dictionary with regist. params
+        :param dict item: dictionary with registration params
         :return dict: the same or updated registration info
         """
         logging.debug('.. converting images to MHD')
