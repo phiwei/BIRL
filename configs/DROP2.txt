@@ -1,4 +1,3 @@
---mode2d
 -l
 --ltype 0
 --lsim 1

@@ -129,14 +129,6 @@ class BmDROP(ImRegBenchmark):
                 convert_image_to_mhd(path_img, path_out_dir=path_reg_dir, overwrite=False,
                                      to_gray=True, scaling=item.get('scaling', 1.))
         item[self.COL_TIME_CONVERT] = time.time() - t_start
-
-        # def __wrap_convert_mhd(path_img, col):
-        #     path_img = convert_image_to_mhd(path_img, to_gray=True, overwrite=False)
-        #     return path_img, col
-        #
-        # for path_img, col in iterate_mproc_map(__wrap_convert_mhd, convert_queue):
-        #     item[col + COL_IMAGE_EXT_TEMP] = path_img
-
         return item
 
     def _generate_regist_command(self, item):
@@ -158,7 +150,6 @@ class BmDROP(ImRegBenchmark):
             os.path.join(path_dir, 'output'),
             self.params['path_config'],
         ])
-
         return command
 
     def _extract_warped_image_landmarks(self, item):

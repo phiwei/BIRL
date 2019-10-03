@@ -363,15 +363,17 @@ def convert_image_to_nifti(path_image, path_out):
     :param str path_out: path to output folder
     :return str: resulted image
 
-    >>> path_img = './sample-image.png'
-    >>> save_image(path_img, np.zeros((100, 200, 3)))
+    >>> path_img = os.path.join(update_path('data_images'), 'images',
+    ...                         'artificial_moving-affine.jpg')
     >>> path_img2 = convert_image_to_nifti(path_img, '.')
+    >>> path_img2  # doctest: +ELLIPSIS
+    '...artificial_moving-affine.nii'
     >>> os.path.isfile(path_img2)
     True
     >>> path_img3 = convert_image_from_nifti(path_img2, '.')
     >>> os.path.isfile(path_img3)
     True
-    >>> list(map(os.remove, [path_img, path_img2, path_img3]))  # doctest: +ELLIPSIS
+    >>> list(map(os.remove, [path_img2, path_img3]))  # doctest: +ELLIPSIS
     [...]
     """
     img_name = os.path.splitext(os.path.basename(path_image))[0]
