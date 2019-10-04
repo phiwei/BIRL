@@ -237,11 +237,10 @@ class BmDROP(ImRegBenchmark):
             assert os.path.isfile(path_deform_), 'missing deformation: %s' % path_deform_
             deform_ = sitk.GetArrayFromImage(sitk.ReadImage(path_deform_))
             assert deform_ is not None, 'loaded deformation is Empty - %s' % path_deform_
-            for i in range(2):
-                lnds_max = max(lnds[:, 1 - i])
-                assert lnds_max < deform_.shape[i], \
-                    'for axis %i landmarks of max=%f exceeded size=%i' \
-                    % (i, lnds_max, deform_.shape[i])
+            lnds_max = np.max(lnds, axis=0)[::-1]
+            assert all(ln < dim for ln, dim in zip(lnds_max, deform_.shape)), \
+                'landmarks max %s is larger then (exceeded) deformation shape %s' \
+                % (lnds_max.tolist(), deform_.shape)
             shift_ = deform_[lnds[:, 1], lnds[:, 0]]
             return shift_
 

@@ -57,12 +57,11 @@ import sys
 import shutil
 import logging
 
+import nibabel
 import numpy as np
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
-from birl.utilities.data_io import (
-    convert_image_from_nifti, save_landmarks, load_landmarks, image_sizes,
-    load_image, save_image, image_resize, load_config_args)
+from birl.utilities.data_io import save_landmarks, load_landmarks, load_config_args
 from bm_experiments import bm_comp_perform
 from bm_experiments.bm_DROP import BmDROP
 
@@ -142,34 +141,26 @@ class BmDROP2(BmDROP):
         path_img_warp = os.path.join(path_reg_dir, os.path.basename(path_im_move))
         shutil.move(os.path.join(path_reg_dir, 'output.jpeg'), path_img_warp)
 
-        # TODO
+        # load transform and warp landmarks
+        # lnds_move = load_landmarks(path_lnds_move)
+        lnds_ref = load_landmarks(path_lnds_ref)
+        lnds_name = os.path.basename(path_lnds_ref)
+        path_lnds_warp = os.path.join(path_reg_dir, lnds_name)
+        assert lnds_ref is not None, 'missing landmarks to be transformed "%s"' % lnds_name
 
-        # # load transform and warp landmarks
-        # # lnds_move = load_landmarks(path_lnds_move)
-        # lnds_ref = load_landmarks(path_lnds_ref)
-        # lnds_name = os.path.basename(path_lnds_ref)
-        # path_lnds_warp = os.path.join(path_reg_dir, lnds_name)
-        # assert lnds_ref is not None, 'missing landmarks to be transformed "%s"' % lnds_name
-        #
-        # # down-scale landmarks if defined
-        # lnds_ref = lnds_ref / item.get('scaling', 1.)
-        # # extract deformation
-        # path_deform_x = os.path.join(path_reg_dir, 'output_x.mhd')
-        # path_deform_y = os.path.join(path_reg_dir, 'output_y.mhd')
-        # try:
-        #     shift = self.extract_landmarks_shift_from_mhd(path_deform_x, path_deform_y, lnds_ref)
-        # except Exception:
-        #     logging.exception(path_reg_dir)
-        #     shift = np.zeros(lnds_ref.shape)
-        #
-        # # lnds_warp = lnds_move - shift
-        # lnds_warp = lnds_ref + shift
-        # # upscale landmarks if defined
-        # lnds_warp = lnds_warp * item.get('scaling', 1.)
-        # save_landmarks(path_lnds_warp, lnds_warp)
+        # extract deformation
+        path_deform_x = os.path.join(path_reg_dir, 'output_field_x.nii.gz')
+        path_deform_y = os.path.join(path_reg_dir, 'output_field_y.nii.gz')
+        try:
+            shift = self.extract_landmarks_shift_from_nifty(path_deform_x, path_deform_y, lnds_ref)
+        except Exception:
+            logging.exception(path_reg_dir)
+            shift = np.zeros(lnds_ref.shape)
 
-        return {self.COL_IMAGE_MOVE_WARP: path_img_warp,
-                self.COL_POINTS_REF_WARP: path_lnds_ref}
+        # lnds_warp = lnds_move - shift
+        lnds_warp = lnds_ref + shift
+        save_landmarks(path_lnds_warp, lnds_warp)
+
         # return formatted results
         return {self.COL_IMAGE_MOVE_WARP: path_img_warp,
                 self.COL_POINTS_REF_WARP: path_lnds_warp}
@@ -182,6 +173,35 @@ class BmDROP2(BmDROP):
         :return dict: the same or updated registration info
         """
         return super(BmDROP2, self)._clear_after_registration(item, patterns)
+
+    @staticmethod
+    def extract_landmarks_shift_from_nifty(path_deform_x, path_deform_y, lnds):
+        """ given pair of deformation fields and landmark positions get shift
+
+        :param str path_deform_x: path to deformation field in X axis
+        :param str path_deform_y: path to deformation field in Y axis
+        :param ndarray lnds: landmarks
+        :return ndarray: shift for each landmarks
+        """
+        # define function for parsing particular shift from MHD
+        def __parse_shift(path_deform_, lnds):
+            assert os.path.isfile(path_deform_), 'missing deformation: %s' % path_deform_
+            deform_ = nibabel.load(path_deform_).get_data()[:, :, 0]
+            assert deform_ is not None, 'loaded deformation is Empty - %s' % path_deform_
+            lnds_max = np.max(lnds, axis=0)
+            assert all(ln < dim for ln, dim in zip(lnds_max, deform_.shape)), \
+                'landmarks max %s is larger then (exceeded) deformation shape %s' \
+                % (lnds_max.tolist(), deform_.shape)
+            shift_ = deform_[lnds[:, 0], lnds[:, 1]]
+            return shift_
+
+        lnds = np.array(np.round(lnds), dtype=int)
+        # get shift in both axis
+        shift_x = __parse_shift(path_deform_x, lnds)
+        shift_y = __parse_shift(path_deform_y, lnds)
+        # concatenate
+        shift = np.array([shift_x, shift_y]).T
+        return shift
 
 
 # RUN by given parameters
