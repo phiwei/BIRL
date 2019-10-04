@@ -164,8 +164,8 @@ class BmDROP(ImRegBenchmark):
         path_img_ = convert_image_from_mhd(os.path.join(path_reg_dir, 'output.mhd'),
                                            scaling=item.get('scaling', 1.))
         img_name = os.path.splitext(os.path.basename(path_im_move))[0]
-        ext_img = os.path.splitext(os.path.basename(path_img_))[1]
-        path_img_warp = path_img_.replace('output' + ext_img, img_name + ext_img)
+        img_ext = os.path.splitext(os.path.basename(path_img_))[1]
+        path_img_warp = path_img_.replace('output' + img_ext, img_name + img_ext)
         shutil.move(path_img_, path_img_warp)
 
         # load transform and warp landmarks
@@ -196,15 +196,16 @@ class BmDROP(ImRegBenchmark):
         return {self.COL_IMAGE_MOVE_WARP: path_img_warp,
                 self.COL_POINTS_REF_WARP: path_lnds_warp}
 
-    def _clear_after_registration(self, item):
+    def _clear_after_registration(self, item, patterns=('output*', '*.mhd', '*.raw')):
         """ clean unnecessarily files after the registration
 
-        :param dict item: dictionary with regist. information
-        :return dict: the same or updated regist. info
+        :param dict item: dictionary with registration information
+        :param list(str) patterns: string patterns of file names
+        :return dict: the same or updated registration info
         """
         logging.debug('.. cleaning after registration experiment, remove `output`')
         path_reg_dir = self._get_path_reg_dir(item)
-        for ptn in ('output*', '*.mhd', '*.raw'):
+        for ptn in patterns:
             for p_file in glob.glob(os.path.join(path_reg_dir, ptn)):
                 os.remove(p_file)
         return item

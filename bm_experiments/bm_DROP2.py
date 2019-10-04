@@ -54,13 +54,15 @@ from __future__ import absolute_import
 
 import os
 import sys
-import time
+import shutil
 import logging
+
+import numpy as np
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.utilities.data_io import (
-    convert_image_from_mhd, save_landmarks, load_landmarks, image_sizes,
-    load_image, save_image, image_resize)
+    convert_image_from_nifti, save_landmarks, load_landmarks, image_sizes,
+    load_image, save_image, image_resize, load_config_args)
 from bm_experiments import bm_comp_perform
 from bm_experiments.bm_DROP import BmDROP
 
@@ -90,10 +92,11 @@ class BmDROP2(BmDROP):
     >>> shutil.rmtree(path_out, ignore_errors=True)
     """
     #: command for executing the image registration
-    COMMAND_REGISTER = '%(dropRegistration)s --mode2d \
+    COMMAND_REGISTER = '%(dropRegistration)s \
+        --mode2d --ncompose \
         -s %(source)s \
         -t %(target)s \
-        -o %(output)s.nii.gz \
+        -o %(output)s.jpeg \
         %(config)s'
 
     def _prepare_img_registration(self, item):
@@ -102,28 +105,7 @@ class BmDROP2(BmDROP):
         :param dict item: dictionary with registration params
         :return dict: the same or updated registration info
         """
-        logging.debug('.. rescaling images if needed')
-        path_im_ref, path_im_move, _, _ = self._get_paths(item)
-        path_reg_dir = self._get_path_reg_dir(item)
-
-        diags = [image_sizes(p_img)[1] for p_img in (path_im_ref, path_im_move)]
-        item['scaling'] = max(1, max(diags) / float(self.MAX_IMAGE_DIAGONAL))
-
-        if item['scaling'] > 1:
-            # the image is smaller then max, so nothing to do
-            return item
-
-        t_start = time.time()
-        for path_img, col in [(path_im_ref, self.COL_IMAGE_REF),
-                              (path_im_move, self.COL_IMAGE_MOVE)]:
-            img = load_image(path_img)
-            # the MHD usually require pixel value range (0, 255)
-            img = image_resize(img, 1. / item['scaling'], v_range=255)
-            path_img_out = os.path.join(path_reg_dir, os.path.basename(path_img))
-            save_image(path_img_out, img)
-            item[col + self.COL_IMAGE_EXT_TEMP] = path_img_out
-        item[self.COL_TIME_CONVERT] = time.time() - t_start
-
+        # this version uses full images
         return item
 
     def _generate_regist_command(self, item):
@@ -133,9 +115,7 @@ class BmDROP2(BmDROP):
         :return str|list(str): the execution commands
         """
         logging.debug('.. prepare DROP registration command')
-        with open(self.params['path_config'], 'r') as fp:
-            config = [l.rstrip().replace('\\', '') for l in fp.readlines()]
-        config = ' '.join(config)
+        config = load_config_args(self.params['path_config'])
 
         path_im_ref, path_im_move, _, _ = self._get_paths(item)
         path_dir = self._get_path_reg_dir(item)
@@ -156,18 +136,14 @@ class BmDROP2(BmDROP):
         :param dict item: dictionary with registration params
         :return dict: paths to warped images/landmarks
         """
+        path_reg_dir = self._get_path_reg_dir(item)
+        _, path_im_move, path_lnds_ref, _ = self._get_paths(item)
+
+        path_img_warp = os.path.join(path_reg_dir, os.path.basename(path_im_move))
+        shutil.move(os.path.join(path_reg_dir, 'output.jpeg'), path_img_warp)
+
         # TODO
 
-        # path_reg_dir = self._get_path_reg_dir(item)
-        # _, path_im_move, path_lnds_ref, _ = self._get_paths(item)
-        # # convert MHD image
-        # path_img_ = convert_image_from_mhd(os.path.join(path_reg_dir, 'output.mhd'),
-        #                                    scaling=item.get('scaling', 1.))
-        # img_name = os.path.splitext(os.path.basename(path_im_move))[0]
-        # ext_img = os.path.splitext(os.path.basename(path_img_))[1]
-        # path_img_warp = path_img_.replace('output' + ext_img, img_name + ext_img)
-        # shutil.move(path_img_, path_img_warp)
-        #
         # # load transform and warp landmarks
         # # lnds_move = load_landmarks(path_lnds_move)
         # lnds_ref = load_landmarks(path_lnds_ref)
@@ -192,9 +168,20 @@ class BmDROP2(BmDROP):
         # lnds_warp = lnds_warp * item.get('scaling', 1.)
         # save_landmarks(path_lnds_warp, lnds_warp)
 
+        return {self.COL_IMAGE_MOVE_WARP: path_img_warp,
+                self.COL_POINTS_REF_WARP: path_lnds_ref}
         # return formatted results
         return {self.COL_IMAGE_MOVE_WARP: path_img_warp,
                 self.COL_POINTS_REF_WARP: path_lnds_warp}
+
+    def _clear_after_registration(self, item, patterns=('output*', '*.nii.gz')):
+        """ clean unnecessarily files after the registration
+
+        :param dict item: dictionary with registration information
+        :param list(str) patterns: string patterns of file names
+        :return dict: the same or updated registration info
+        """
+        return super(BmDROP2, self)._clear_after_registration(item, patterns)
 
 
 # RUN by given parameters
