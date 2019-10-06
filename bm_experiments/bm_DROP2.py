@@ -92,10 +92,10 @@ class BmDROP2(BmDROP):
     """
     #: command for executing the image registration
     COMMAND_REGISTER = '%(dropRegistration)s \
-        --mode2d --ncompose \
-        -s %(source)s \
-        -t %(target)s \
-        -o %(output)s.jpeg \
+        --mode2d --ocompose \
+        --source %(source)s \
+        --target %(target)s \
+        --output %(output)s.jpeg \
         %(config)s'
 
     def _prepare_img_registration(self, item):
@@ -136,7 +136,7 @@ class BmDROP2(BmDROP):
         :return dict: paths to warped images/landmarks
         """
         path_reg_dir = self._get_path_reg_dir(item)
-        _, path_im_move, path_lnds_ref, _ = self._get_paths(item)
+        path_im_ref, path_im_move, path_lnds_ref, _ = self._get_paths(item)
 
         path_img_warp = os.path.join(path_reg_dir, os.path.basename(path_im_move))
         shutil.move(os.path.join(path_reg_dir, 'output.jpeg'), path_img_warp)
