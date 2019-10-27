@@ -44,9 +44,13 @@ Sample run::
 
 .. note:: experiments was tested on Ubuntu (Linux) based OS system
 
-.. note:: This method is not optimized nor suitable for large images, so all used images
- are first scaled to be 1000x1000 pixels and then the registration is performed.
-  After registration is resulting image scaled back. The landmarks are scalded accordingly.
+.. note:: This uses both directions image registration:
+  * direct (source -> target)
+  * inverse (target -> source).
+ Since there are some issues with using  direct registration for evaluating image registration,
+ we assume (hope, see: https://github.com/biomedia-mira/drop2/issues/2) that both registrations
+ converge to the same minim and so we use inverse for registration evaluation
+ (extracting warped landmarks).
 
 Copyright (C) 2017-2019 Jiri Borovec <jiri.borovec@fel.cvut.cz>
 """
@@ -92,7 +96,7 @@ class BmDROP2(BmDROP):
     """
     #: command for executing the image registration
     COMMAND_REGISTER = '%(dropRegistration)s \
-        --mode2d --ocompose \
+        --mode2d \
         --source %(source)s \
         --target %(target)s \
         --output %(output)s.jpeg \
@@ -119,15 +123,22 @@ class BmDROP2(BmDROP):
         path_im_ref, path_im_move, _, _ = self._get_paths(item)
         path_dir = self._get_path_reg_dir(item)
 
-        command = self.COMMAND_REGISTER % {
-            'dropRegistration': self.params['exec_DROP'],
-            'source': path_im_move,
-            'target': path_im_ref,
-            'output': os.path.join(path_dir, 'output'),
-            'config': config,
-        }
+        def __cmd(p_target, p_source):
+            command = self.COMMAND_REGISTER % {
+                'dropRegistration': self.params['exec_DROP'],
+                'source': p_source,
+                'target': p_target,
+                'output': os.path.join(path_dir, 'output'),
+                'config': config,
+            }
+            return command
 
-        return command
+        cmd_direct = __cmd(path_im_ref, path_im_move)
+        # generate output deformation field and no warped image
+        cmd_inverse = __cmd(path_im_move, path_im_ref)
+        cmd_inverse += ' '.join([' --ocompose', '--onoimage'])
+
+        return [cmd_direct, cmd_inverse]
 
     def _extract_warped_image_landmarks(self, item):
         """ get registration results - warped registered images and landmarks
@@ -136,34 +147,34 @@ class BmDROP2(BmDROP):
         :return dict: paths to warped images/landmarks
         """
         path_reg_dir = self._get_path_reg_dir(item)
-        path_im_ref, path_im_move, path_lnds_ref, _ = self._get_paths(item)
+        path_im_ref, path_im_move, path_lnds_ref, path_lnds_move = self._get_paths(item)
 
         path_img_warp = os.path.join(path_reg_dir, os.path.basename(path_im_move))
         shutil.move(os.path.join(path_reg_dir, 'output.jpeg'), path_img_warp)
 
         # load transform and warp landmarks
-        # lnds_move = load_landmarks(path_lnds_move)
-        lnds_ref = load_landmarks(path_lnds_ref)
+        lnds_ = load_landmarks(path_lnds_move)
+        # lnds_ = load_landmarks(path_lnds_ref)
         lnds_name = os.path.basename(path_lnds_ref)
         path_lnds_warp = os.path.join(path_reg_dir, lnds_name)
-        assert lnds_ref is not None, 'missing landmarks to be transformed "%s"' % lnds_name
+        assert lnds_ is not None, 'missing landmarks to be transformed "%s"' % lnds_name
 
         # extract deformation
         path_deform_x = os.path.join(path_reg_dir, 'output_field_x.nii.gz')
         path_deform_y = os.path.join(path_reg_dir, 'output_field_y.nii.gz')
         try:
-            shift = self.extract_landmarks_shift_from_nifty(path_deform_x, path_deform_y, lnds_ref)
+            shift = self.extract_landmarks_shift_from_nifty(path_deform_x, path_deform_y, lnds_)
         except Exception:
             logging.exception(path_reg_dir)
-            shift = np.zeros(lnds_ref.shape)
+            shift = np.zeros(lnds_.shape)
 
         # lnds_warp = lnds_move - shift
-        lnds_warp = lnds_ref + shift
+        lnds_warp = lnds_ + shift
         save_landmarks(path_lnds_warp, lnds_warp)
 
         # return formatted results
         return {self.COL_IMAGE_MOVE_WARP: path_img_warp,
-                self.COL_POINTS_REF_WARP: path_lnds_warp}
+                self.COL_POINTS_MOVE_WARP: path_lnds_warp}
 
     def _clear_after_registration(self, item, patterns=('output*', '*.nii.gz')):
         """ clean unnecessarily files after the registration
@@ -202,6 +213,10 @@ class BmDROP2(BmDROP):
         # concatenate
         shift = np.array([shift_x, shift_y]).T
         return shift
+
+    def _extract_execution_time(self, item):
+        # since we run both registrations and it is measured as one, we take just a half
+        return item[self.COL_TIME] / 2.
 
 
 # RUN by given parameters
