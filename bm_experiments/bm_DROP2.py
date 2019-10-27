@@ -168,7 +168,6 @@ class BmDROP2(BmDROP):
             logging.exception(path_reg_dir)
             shift = np.zeros(lnds_.shape)
 
-        # lnds_warp = lnds_move - shift
         lnds_warp = lnds_ + shift
         save_landmarks(path_lnds_warp, lnds_warp)
 
@@ -197,13 +196,13 @@ class BmDROP2(BmDROP):
         # define function for parsing particular shift from MHD
         def __parse_shift(path_deform_, lnds):
             assert os.path.isfile(path_deform_), 'missing deformation: %s' % path_deform_
-            deform_ = nibabel.load(path_deform_).get_data()[:, :, 0]
+            deform_ = nibabel.load(path_deform_).get_data()[:, :, 0].T
             assert deform_ is not None, 'loaded deformation is Empty - %s' % path_deform_
-            lnds_max = np.max(lnds, axis=0)
+            lnds_max = np.max(lnds, axis=0)[::-1]
             assert all(ln < dim for ln, dim in zip(lnds_max, deform_.shape)), \
                 'landmarks max %s is larger then (exceeded) deformation shape %s' \
                 % (lnds_max.tolist(), deform_.shape)
-            shift_ = deform_[lnds[:, 0], lnds[:, 1]]
+            shift_ = deform_[lnds[:, 1], lnds[:, 0]]
             return shift_
 
         lnds = np.array(np.round(lnds), dtype=int)
